@@ -26,16 +26,19 @@ def send_notification(new_jobs: List[JobRecord]) -> bool:
         title = NTFY_TITLE
 
     url = f"{NTFY_BASE_URL.rstrip('/')}/{NTFY_TOPIC}"
+    headers = {
+        "Title": title,
+        "Tags": "books,mag",
+        "Priority": "3",
+    }
+    if len(new_jobs) == 1 and new_jobs[0].job_url:
+        headers["Click"] = new_jobs[0].job_url
 
     try:
         response = requests.post(
             url,
             data=message.encode("utf-8"),
-            headers={
-                "Title": title,
-                "Tags": "books,mag",
-                "Priority": "3",
-            },
+            headers=headers,
             timeout=REQUEST_TIMEOUT,
         )
         response.raise_for_status()
@@ -51,7 +54,8 @@ def _format_new_jobs_message(new_jobs: List[JobRecord]) -> str:
 
     for job in new_jobs:
         institution = job.institution or job.university or "Unknown Institution"
-        block = f"• {job.title}\n  {institution}"
+        link = job.job_url or "No link available"
+        block = f"• {job.title}\n  {institution}\n  {link}"
         candidate = "\n".join(lines + [block])
         if len(candidate.encode("utf-8")) > MAX_MESSAGE_BYTES:
             remaining = len(new_jobs) - (len(lines) - 1)
