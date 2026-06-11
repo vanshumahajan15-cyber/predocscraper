@@ -2,9 +2,11 @@ name: Daily Predoc Scraper
 
 on:
   schedule:
-    # GitHub cron uses UTC. 14:00 UTC = 9 AM CDT; 15:00 UTC = 9 AM CST.
-    # The time-check step ensures exactly one run per day at 9 AM Chicago.
+    # GitHub cron uses UTC. Time-check step ensures correct America/Chicago slots.
+    # 9:00 AM Chicago — 14:00 UTC (CDT) or 15:00 UTC (CST)
     - cron: "0 14,15 * * *"
+    # 7:50 PM Chicago — 00:50 UTC (CDT) or 01:50 UTC (CST)
+    - cron: "50 0,1 * * *"
   workflow_dispatch:
 
 permissions:
@@ -20,7 +22,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Check if 9 AM America/Chicago
+      - name: Check scheduled America/Chicago time
         id: timecheck
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -29,12 +31,16 @@ jobs:
             exit 0
           fi
           CHICAGO_HOUR=$(TZ=America/Chicago date +%H)
-          if [ "$CHICAGO_HOUR" = "09" ]; then
+          CHICAGO_MIN=$(TZ=America/Chicago date +%M)
+          if [ "$CHICAGO_HOUR" = "09" ] && [ "$CHICAGO_MIN" = "00" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "Chicago hour is 09 — proceeding."
+            echo "Scheduled slot: 9:00 AM Chicago — proceeding."
+          elif [ "$CHICAGO_HOUR" = "19" ] && [ "$CHICAGO_MIN" = "50" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Scheduled slot: 7:50 PM Chicago — proceeding."
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping: Chicago hour is $CHICAGO_HOUR (not 09)."
+            echo "Skipping: Chicago time is ${CHICAGO_HOUR}:${CHICAGO_MIN} (not 09:00 or 19:50)."
           fi
 
       - name: Checkout repository

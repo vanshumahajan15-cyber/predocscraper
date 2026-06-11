@@ -134,14 +134,15 @@ Override via environment variables:
 
 ## GitHub Actions (Automatic Daily Run — Recommended)
 
-The repo includes a workflow that runs **every day at 9:00 AM America/Chicago**, even when your PC is off.
+The repo includes a workflow that runs **twice daily** at **9:00 AM** and **7:50 PM** America/Chicago, even when your PC is off.
 
 **File:** `.github/workflows/daily-scrape.yml`
 
 | Setting | Value |
 |---------|-------|
-| **Schedule** | `0 14,15 * * *` (UTC) with Chicago time check |
-| **Timezone** | America/Chicago (9:00 AM) |
+| **Schedule (morning)** | `0 14,15 * * *` (UTC) → **9:00 AM** Chicago |
+| **Schedule (evening)** | `50 0,1 * * *` (UTC) → **7:50 PM** Chicago |
+| **Timezone** | America/Chicago |
 | **Command** | `python main.py` |
 | **Data persistence** | Commits updated `data/predoc_jobs.csv` and `data/predoc_jobs.json` back to the repo |
 
