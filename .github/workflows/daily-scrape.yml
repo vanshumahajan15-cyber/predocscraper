@@ -2,11 +2,13 @@ name: Daily Predoc Scraper
 
 on:
   schedule:
-    # GitHub cron uses UTC. Time-check step ensures correct America/Chicago slots.
-    # 9:00 AM Chicago — 14:00 UTC (CDT) or 15:00 UTC (CST)
-    - cron: "0 14,15 * * *"
-    # 7:50 PM Chicago — 00:50 UTC (CDT) or 01:50 UTC (CST)
-    - cron: "50 0,1 * * *"
+    # GitHub cron uses UTC. Pairs cover CDT/CST; time-check enforces Chicago slots.
+    - cron: "0 11,12 * * *"   # 6:00 AM Chicago
+    - cron: "0 15,16 * * *"   # 10:00 AM Chicago
+    - cron: "0 19,20 * * *"   # 2:00 PM Chicago
+    - cron: "0 23 * * *"      # 6:00 PM Chicago (CDT)
+    - cron: "0 0 * * *"       # 6:00 PM Chicago (CST)
+    - cron: "0 3,4 * * *"     # 10:00 PM Chicago
   workflow_dispatch:
 
 permissions:
@@ -30,17 +32,42 @@ jobs:
             echo "Manual run — proceeding."
             exit 0
           fi
-          CHICAGO_HOUR=$(TZ=America/Chicago date +%H)
-          CHICAGO_MIN=$(TZ=America/Chicago date +%M)
-          if [ "$CHICAGO_HOUR" = "09" ] && [ "$CHICAGO_MIN" = "00" ]; then
+
+          CHICAGO_HOUR=$(TZ=America/Chicago date +%H | sed 's/^0//')
+          CHICAGO_MIN=$(TZ=America/Chicago date +%M | sed 's/^0//')
+          CHICAGO_HOUR=${CHICAGO_HOUR:-0}
+          CHICAGO_MIN=${CHICAGO_MIN:-0}
+          CURRENT=$((CHICAGO_HOUR * 60 + CHICAGO_MIN))
+
+          # 6 AM, 10 AM, 2 PM, 6 PM, 10 PM — allow ±10 min for GitHub queue delays
+          SLOTS="360 600 840 1080 1320"
+          RUN=false
+          MATCHED=""
+
+          for slot in $SLOTS; do
+            diff=$((CURRENT - slot))
+            if [ "$diff" -lt 0 ]; then diff=$(( -diff )); fi
+            if [ "$diff" -le 10 ]; then
+              RUN=true
+              MATCHED=$slot
+              break
+            fi
+          done
+
+          if [ "$RUN" = "true" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "Scheduled slot: 9:00 AM Chicago — proceeding."
-          elif [ "$CHICAGO_HOUR" = "19" ] && [ "$CHICAGO_MIN" = "50" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "Scheduled slot: 7:50 PM Chicago — proceeding."
+            case $MATCHED in
+              360)  echo "Scheduled slot: 6:00 AM Chicago — proceeding." ;;
+              600)  echo "Scheduled slot: 10:00 AM Chicago — proceeding." ;;
+              840)  echo "Scheduled slot: 2:00 PM Chicago — proceeding." ;;
+              1080) echo "Scheduled slot: 6:00 PM Chicago — proceeding." ;;
+              1320) echo "Scheduled slot: 10:00 PM Chicago — proceeding." ;;
+            esac
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping: Chicago time is ${CHICAGO_HOUR}:${CHICAGO_MIN} (not 09:00 or 19:50)."
+            printf -v hh "%02d" $((CHICAGO_HOUR))
+            printf -v mm "%02d" $((CHICAGO_MIN))
+            echo "Skipping: Chicago time is ${hh}:${mm} (not within ±10 min of a scheduled slot)."
           fi
 
       - name: Checkout repository
