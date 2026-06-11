@@ -1,0 +1,79 @@
+name: Daily Predoc Scraper
+
+on:
+  schedule:
+    # GitHub cron uses UTC. 14:00 UTC = 9 AM CDT; 15:00 UTC = 9 AM CST.
+    # The time-check step ensures exactly one run per day at 9 AM Chicago.
+    - cron: "0 14,15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: predoc-scraper
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check if 9 AM America/Chicago
+        id: timecheck
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual run — proceeding."
+            exit 0
+          fi
+          CHICAGO_HOUR=$(TZ=America/Chicago date +%H)
+          if [ "$CHICAGO_HOUR" = "09" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Chicago hour is 09 — proceeding."
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping: Chicago hour is $CHICAGO_HOUR (not 09)."
+          fi
+
+      - name: Checkout repository
+        if: steps.timecheck.outputs.run == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: steps.timecheck.outputs.run == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        if: steps.timecheck.outputs.run == 'true'
+        run: pip install -r requirements.txt
+
+      - name: Run scraper
+        if: steps.timecheck.outputs.run == 'true'
+        run: python main.py
+
+      - name: Commit updated job data
+        if: steps.timecheck.outputs.run == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/predoc_jobs.csv data/predoc_jobs.json
+          if git diff --staged --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "chore: update job data from daily scrape [skip ci]"
+            git push
+          fi
+
+      - name: Upload logs artifact
+        if: steps.timecheck.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-logs-${{ github.run_id }}
+          path: logs/scraper.log
+          if-no-files-found: ignore
+          retention-days: 7

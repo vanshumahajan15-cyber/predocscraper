@@ -132,6 +132,38 @@ Override via environment variables:
 
 ---
 
+## GitHub Actions (Automatic Daily Run — Recommended)
+
+The repo includes a workflow that runs **every day at 9:00 AM America/Chicago**, even when your PC is off.
+
+**File:** `.github/workflows/daily-scrape.yml`
+
+| Setting | Value |
+|---------|-------|
+| **Schedule** | `0 14,15 * * *` (UTC) with Chicago time check |
+| **Timezone** | America/Chicago (9:00 AM) |
+| **Command** | `python main.py` |
+| **Data persistence** | Commits updated `data/predoc_jobs.csv` and `data/predoc_jobs.json` back to the repo |
+
+### Enable it (one-time)
+
+1. Open [your repo on GitHub](https://github.com/vanshumahajan15-cyber/predocscraper)
+2. Go to **Settings → Actions → General**
+3. Under **Workflow permissions**, select **Read and write permissions**
+4. Save
+
+### Verify
+
+1. Go to the **Actions** tab
+2. Click **Daily Predoc Scraper → Run workflow** to test manually
+3. Check your ntfy topic `predoc` for a notification
+
+### Manual run anytime
+
+GitHub → **Actions** → **Daily Predoc Scraper** → **Run workflow**
+
+---
+
 ## Render Cron Job Deployment
 
 ### 1. Push this repo to GitHub
